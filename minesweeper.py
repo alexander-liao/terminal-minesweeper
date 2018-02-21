@@ -119,9 +119,6 @@ def write_char(char):
 def clear():
     sys.stdout.write("\033[2J\033[1;1H")
 
-def reset():
-    sys.stdout.write("\033[0m\033[40m")
-
 def size():
     return struct.unpack('HHHH', fcntl.ioctl(0, termios.TIOCGWINSZ, struct.pack('HHHH', 0, 0, 0, 0)))[:2]
 
@@ -141,6 +138,7 @@ def getIntInput(prompt, retry, MIN = None, MAX = None):
             pass
 
 def start():
+    clear()
     print("Terminal Minesweeper v0.1 by Alexander Liao (c) 2018.")
     print("This software is provided as-is with no warranty.")
     print("See LICENSE for more information. This software is licensed under the MIT License.")
@@ -167,39 +165,70 @@ def start():
     grid = [[0] * width for _ in range(height)]
     coords = [(r, c) for r in range(height) for c in range(width)]
     random.shuffle(coords)
-    coords = coords[:mines]
+    coords = set(coords[:mines])
     neighbor_info = [[0] * width for _ in range(height)]
     for r, c in coords:
         grid[r][c] = 1
-        for (R, C) in ((r + 1, c), (r, c + 1), (r - 1, c), (r, c - 1)):
-            if 0 <= R < height and 0 <= C < width:
-                neighbor_info[R][C] += 1
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                if i or j:
+                    R, C = r + i, c + j
+                    if 0 <= R < height and 0 <= C < width:
+                        neighbor_info[R][C] += 1
     player_info = [[0] * width for _ in range(height)]
     cx = 0
     cy = 0
+    def reveal(r, c):
+        if 0 <= r < height and 0 <= c < width and not (2 <= player_info[r][c] <= 10) and not grid[r][c]:
+            a = player_info[r][c] = neighbor_info[r][c] + 2
+            if a == 2:
+                for i in range(-1, 2):
+                    for j in range(-1, 2):
+                        if i or j:
+                            reveal(r + i, c + j)
     def show_grid():
         clear()
         h = len(str(height))
         w = len(str(width))
-        print(" " * (h + cx) + "v")
+        print(" " * (h + cx) + " v")
         for i in range(w):
             q = 10 ** (w - i - 1)
-            print(" " * h + "".join(str(j // q % (q * 10) if j >= q or (j == 0 and q == 1) else " ") for j in range(width)))
+            print(" " * h + " " + "".join(str(j // q % (q * 10) if j >= q or (j == 0 and q == 1) else " ") for j in range(width)))
         for j, r in enumerate(player_info):
-            print((">" if j == cy else " ") + str(j).rjust(w) + "".join(["-"][e] for e in r))
+            print((">" if j == cy else " ") + str(j).rjust(w) + "".join("\033[47m" * (j == cy and i == cx) + [" ", "\033[1;31mF", "\033[1;30m0", "\033[33m1", "\033[34m2", "\033[1;33m3", "\033[1;34m4", "\033[1;35m5", "\033[1;37m6", "\033[1;37m7", "\033[1;37m8"][e] + "\033[0m" for i, e in enumerate(r)))
     show_grid()
+    start = time.time()
+    flagged = set()
     while True:
-        mode = getComboOption([(27, 91, 65), (27, 91, 66), (27, 91, 67), (27, 91, 68)])
-        if mode == (27, 91, 65):
+        mode = getComboOption([[113], [102], [32], [27, 91, 65], [27, 91, 66], [27, 91, 67], [27, 91, 68]])
+        if mode == [113]:
+            break
+        elif mode == [102]:
+            if player_info[cy][cx] == 1:
+                flagged.remove((cy, cx))
+                player_info[cy][cx] = 0
+            else:
+                flagged.add((cy, cx))
+                player_info[cy][cx] = 1
+                if flagged == coords:
+                    print("You win!\nThe game took %.2f seconds." % (time.time() - start))
+                    break
+        elif mode == [32]:
+            if grid[cy][cx]:
+                print("Oops! You exploded. Better luck next time!")
+                break
+            else:
+                reveal(cy, cx)
+        elif mode == [27, 91, 65]:
             cy -= 1
             cy %= height
-        elif mode == (27, 91, 66):
+        elif mode == [27, 91, 66]:
             cy += 1
             cy %= height
-        elif mode == (27, 91, 67):
+        elif mode == [27, 91, 67]:
             cx += 1
             cx %= width
-        elif mode == (27, 91, 68):
+        elif mode == [27, 91, 68]:
             cx -= 1
             cx %= width
         show_grid()
