@@ -112,12 +112,15 @@ def getComboOption(options):
 
 def draw_char(r, c, char):
     sys.stdout.write("\033[%d;%dH%s\033[1B" % (r, c, char))
+    sys.stdout.flush()
 
 def write_char(char):
     sys.stdout.write(char)
+    sys.stdout.flush()
 
 def clear():
-    sys.stdout.write("\033[2J\033[1;1H")
+    sys.stdout.write("\033[0m\033[2J\033[1;1H")
+    sys.stdout.flush()
 
 def size():
     return struct.unpack('HHHH', fcntl.ioctl(0, termios.TIOCGWINSZ, struct.pack('HHHH', 0, 0, 0, 0)))[:2]
@@ -137,13 +140,13 @@ def getIntInput(prompt, retry, MIN = None, MAX = None):
         except:
             pass
 
-def start():
+def start(*vals):
     clear()
     print("Terminal Minesweeper v0.1 by Alexander Liao (c) 2018.")
     print("This software is provided as-is with no warranty.")
     print("See LICENSE for more information. This software is licensed under the MIT License.")
     print()
-    diff = input("Please select a difficulty [easy | medium | hard | custom]: ").lower()
+    diff = vals[0] if len(vals) >= 1 else input("Please select a difficulty [easy | medium | hard | custom]: ").lower()
     while diff not in ["easy", "medium", "hard", "custom"]:
         diff = input("Invalid selection. Please choose from [easy | medium | hard | custom]: ").lower()
     if diff == "easy":
@@ -159,9 +162,9 @@ def start():
         height = 16
         mines  = 99
     else:
-        width  = getIntInput("Please enter a width between 1 and %d: " % size()[1], "Not a valid integer in the range. Please try again: ", 1, size()[1])
-        height = getIntInput("Please enter a height between 1 and %d: " % size()[0], "Not a valid integer in the range. Please try again: ", 1, size()[0])
-        mines  = getIntInput("Please enter a number of mines between 1 and %d: " % (width * height), "Not a valid integer in the range. Please try again: ", 1, width * height)
+        width  = vals[1] if len(vals) >= 2 and type(vals[1]) == int else getIntInput("Please enter a width between 1 and %d: " % (size()[1] - 5), "Not a valid integer in the range. Please try again: ", 1, size()[1] - 3)
+        height = vals[2] if len(vals) >= 3 and type(vals[2]) == int else getIntInput("Please enter a height between 1 and %d: " % (size()[0] - 5), "Not a valid integer in the range. Please try again: ", 1, size()[0] - 3)
+        mines  = vals[3] if len(vals) >= 4 and type(vals[3]) == int else getIntInput("Please enter a number of mines between 1 and %d: " % (width * height), "Not a valid integer in the range. Please try again: ", 1, width * height)
     grid = [[0] * width for _ in range(height)]
     coords = [(r, c) for r in range(height) for c in range(width)]
     random.shuffle(coords)
@@ -178,44 +181,76 @@ def start():
     player_info = [[0] * width for _ in range(height)]
     cx = 0
     cy = 0
-    def reveal(r, c):
+    strings = [
+        " ",
+        "\033[1;31mF",
+        "\033[1;30m0",
+        "\033[33m1",
+        "\033[34m2",
+        "\033[1;33m3",
+        "\033[1;34m4",
+        "\033[1;35m5",
+        "\033[1;37m6",
+        "\033[1;37m7",
+        "\033[1;37m8"
+    ]
+    def reveal(r, c, current = False):
         if 0 <= r < height and 0 <= c < width and not (2 <= player_info[r][c] <= 10) and not grid[r][c]:
             a = player_info[r][c] = neighbor_info[r][c] + 2
+            sys.stdout.write("\033[%d;%dH%s" % (r + 3, c + 3, strings[a] + "\033[0m"))
+            sys.stdout.flush()
             if a == 2:
                 for i in range(-1, 2):
                     for j in range(-1, 2):
                         if i or j:
                             reveal(r + i, c + j)
+    def display_border():
+        print("\n +" + "-" * width + "+\n" + (" |" + " " * width + "|\n") * height + " +" + "-" * width + "+", end = "")
+    def wipe_vcursors():
+        sys.stdout.write("\033[1;1H\033[0m  " + " " * width)
+        sys.stdout.flush()
+    def wipe_hcursors():
+        sys.stdout.write("\033[1;1H\033[0m\n " + "\n " * height)
+        sys.stdout.flush()
     def show_grid():
         clear()
         h = len(str(height))
         w = len(str(width))
-        print(" " * (h + cx) + " v")
-        for i in range(w):
-            q = 10 ** (w - i - 1)
-            print(" " * h + " " + "".join(str(j // q % (q * 10) if j >= q or (j == 0 and q == 1) else " ") for j in range(width)))
+        print(" " * cx + "  v")
+        print(" +" + "-" * width + "+")
         for j, r in enumerate(player_info):
-            print((">" if j == cy else " ") + str(j).rjust(w) + "".join("\033[47m" * (j == cy and i == cx) + [" ", "\033[1;31mF", "\033[1;30m0", "\033[33m1", "\033[34m2", "\033[1;33m3", "\033[1;34m4", "\033[1;35m5", "\033[1;37m6", "\033[1;37m7", "\033[1;37m8"][e] + "\033[0m" for i, e in enumerate(r)))
-    show_grid()
+            print((">" if j == cy else " ") + "|" + "".join(strings[e] + "\033[0m" for i, e in enumerate(r)) + "|")
+        print(" +" + "-" * width + "+", end = "")
+    clear()
+    display_border()
+    sys.stdout.write("\033[1;1H  v\n\n>\033[3;3H")
+    sys.stdout.flush()
     start = time.time()
     flagged = set()
     while True:
         mode = getComboOption([[113], [102], [32], [27, 91, 65], [27, 91, 66], [27, 91, 67], [27, 91, 68]])
         if mode == [113]:
+            sys.stdout.write("\033[%d;1H" % (height + 5))
             break
         elif mode == [102]:
             if player_info[cy][cx] == 1:
                 flagged.remove((cy, cx))
                 player_info[cy][cx] = 0
-            else:
+                sys.stdout.write("\033[%d;%dH\033[0m " % (cy + 3, cx + 3))
+                sys.stdout.flush()
+            elif player_info[cy][cx] == 0:
                 flagged.add((cy, cx))
                 player_info[cy][cx] = 1
+                sys.stdout.write("\033[%d;%dH\033[1;31mF\033[0m" % (cy + 3, cx + 3))
+                sys.stdout.flush()
                 if flagged == coords:
-                    print("You win!\nThe game took %.2f seconds." % (time.time() - start))
+                    print("\033[%d;1HYou win!\nThe game took %.2f seconds." % (height + 5, time.time() - start))
                     break
         elif mode == [32]:
+            if player_info[cy][cx] == 1:
+                continue
             if grid[cy][cx]:
-                print("Oops! You exploded. Better luck next time!")
+                print("\033[%d;1HOops! You exploded. Better luck next time!" % (height + 5))
                 break
             else:
                 reveal(cy, cx)
@@ -231,6 +266,9 @@ def start():
         elif mode == [27, 91, 68]:
             cx -= 1
             cx %= width
-        show_grid()
+        wipe_hcursors()
+        wipe_vcursors()
+        sys.stdout.write("\033[%d;1H>\033[1;%dHv\033[%d;%dH" % (cy + 3, cx + 3, cy + 3, cx + 3))
+        sys.stdout.flush()
 
-start()
+start("custom", 145, 32, 1000)
