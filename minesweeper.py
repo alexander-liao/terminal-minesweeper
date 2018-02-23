@@ -166,7 +166,7 @@ def start(*vals):
         height = vals[2] if len(vals) >= 3 and type(vals[2]) == int else getIntInput("Please enter a height between 1 and %d: " % (size()[0] - 5), "Not a valid integer in the range. Please try again: ", 1, size()[0] - 3)
         mines  = vals[3] if len(vals) >= 4 and type(vals[3]) == int else getIntInput("Please enter a number of mines between 1 and %d: " % (width * height), "Not a valid integer in the range. Please try again: ", 1, width * height)
     grid = [[0] * width for _ in range(height)]
-    coords = [(r, c) for r in range(height) for c in range(width)]
+    coords = [(r, c) for r in range(height) for c in range(width) if r or c]
     random.shuffle(coords)
     coords = set(coords[:mines])
     neighbor_info = [[0] * width for _ in range(height)]
@@ -194,16 +194,24 @@ def start(*vals):
         "\033[1;37m7",
         "\033[1;37m8"
     ]
-    def reveal(r, c, current = False):
-        if 0 <= r < height and 0 <= c < width and not (2 <= player_info[r][c] <= 10) and not grid[r][c]:
-            a = player_info[r][c] = neighbor_info[r][c] + 2
-            sys.stdout.write("\033[%d;%dH%s" % (r + 3, c + 3, strings[a] + "\033[0m"))
-            sys.stdout.flush()
-            if a == 2:
-                for i in range(-1, 2):
-                    for j in range(-1, 2):
-                        if i or j:
-                            reveal(r + i, c + j)
+    def reveal(R, C, current = False):
+        passed = set()
+        coords = {(R, C)}
+        while coords:
+            passed |= coords
+            current = list(coords)
+            coords = set()
+            for r, c in current:
+                if 0 <= r < height and 0 <= c < width and not (2 <= player_info[r][c] <= 10) and not grid[r][c]:
+                    a = player_info[r][c] = neighbor_info[r][c] + 2
+                    sys.stdout.write("\033[%d;%dH%s" % (r + 3, c + 3, strings[a] + "\033[0m"))
+                    sys.stdout.flush()
+                    if a == 2:
+                        for i in range(-1, 2):
+                            for j in range(-1, 2):
+                                if i or j:
+                                    if (r + i, c + j) not in passed:
+                                        coords.add((r + i, c + j))
     def display_border():
         print("\n +" + "-" * width + "+\n" + (" |" + " " * width + "|\n") * height + " +" + "-" * width + "+", end = "")
     def wipe_vcursors():
@@ -243,9 +251,9 @@ def start(*vals):
                 player_info[cy][cx] = 1
                 sys.stdout.write("\033[%d;%dH\033[1;31mF\033[0m" % (cy + 3, cx + 3))
                 sys.stdout.flush()
-                if flagged == coords:
-                    print("\033[%d;1HYou win!\nThe game took %.2f seconds." % (height + 5, time.time() - start))
-                    break
+            if flagged == coords:
+                print("\033[%d;1HYou win!\nThe game took %.2f seconds." % (height + 5, time.time() - start))
+                break
         elif mode == [32]:
             if player_info[cy][cx] == 1:
                 continue
@@ -271,4 +279,4 @@ def start(*vals):
         sys.stdout.write("\033[%d;1H>\033[1;%dHv\033[%d;%dH" % (cy + 3, cx + 3, cy + 3, cx + 3))
         sys.stdout.flush()
 
-start("custom", 145, 32, 1000)
+start("easy")
