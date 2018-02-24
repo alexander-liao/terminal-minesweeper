@@ -284,4 +284,4 @@ def start(*vals):
         sys.stdout.write("\033[%d;1H>\033[1;%dHv\033[%d;%dH" % (cy + 3, cx + 3, cy + 3, cx + 3))
         sys.stdout.flush()
 
-start("easy")
+start()
