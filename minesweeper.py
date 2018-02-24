@@ -194,6 +194,19 @@ def start(*vals):
         "\033[1;37m7",
         "\033[1;37m8"
     ]
+    def finalBoardString():
+        string = " +" + "-" * width + "+"
+        return "\n" + string + "\n" + "\n".join(
+            " |" + "".join(
+                (
+                    "\033[41mO"
+                    if grid[r][c]
+                    else strings[2 + neighbor_info[r][c]]
+                ) + "\033[0m"
+                for c in range(width))
+            + "|"
+        for r in range(height)) + "\n" + string
+    flagged = set()
     def reveal(R, C, current = False):
         passed = set()
         coords = {(R, C)}
@@ -202,8 +215,11 @@ def start(*vals):
             current = list(coords)
             coords = set()
             for r, c in current:
+                if grid[r][c]: 1 / 0
                 if 0 <= r < height and 0 <= c < width and not grid[r][c]:
                     a = player_info[r][c] = neighbor_info[r][c] + 2
+                    if (r, c) in flagged:
+                        flagged.remove((r, c))
                     sys.stdout.write("\033[%d;%dH%s" % (r + 3, c + 3, strings[a] + "\033[0m"))
                     sys.stdout.flush()
                     subcoords = set()
@@ -213,9 +229,9 @@ def start(*vals):
                             if (i or j) and 0 <= r + i < height and 0 <= c + j < width:
                                 if player_info[r + i][c + j] == 1:
                                     total += 1
-                                if (r + i, c + j) not in passed:
+                                if (r + i, c + j) not in passed | flagged:
                                     subcoords.add((r + i, c + j))
-                    if a == 2: #total + 2 == a: # TODO ask betseg about this
+                    if total + 2 == a:
                         coords |= subcoords
     def display_border():
         print("\n +" + "-" * width + "+\n" + (" |" + " " * width + "|\n") * height + " +" + "-" * width + "+", end = "")
@@ -239,7 +255,6 @@ def start(*vals):
     sys.stdout.write("\033[1;1H  v\n\n>\033[3;3H")
     sys.stdout.flush()
     start = time.time()
-    flagged = set()
     while True:
         mode = getComboOption([[113], [102], [32], [27, 91, 65], [27, 91, 66], [27, 91, 67], [27, 91, 68]])
         if mode == [113]:
@@ -256,17 +271,26 @@ def start(*vals):
                 player_info[cy][cx] = 1
                 sys.stdout.write("\033[%d;%dH\033[1;31mF\033[0m" % (cy + 3, cx + 3))
                 sys.stdout.flush()
+            else:
+                a = [(cy + i, cx + j) for i in range(-1, 2) for j in range(-1, 2) if 0 <= cy + i < height and 0 <= cx + j < width and player_info[cy + i][cx + j] < 2]
+                if len(a) == neighbor_info[cy][cx]:
+                    for r, c in a:
+                        flagged.add((r, c))
+                        player_info[r][c] = 1
+                        sys.stdout.write("\033[%d;%dH\033[1;31mF\033[0m" % (r + 3, c + 3))
+                        sys.stdout.flush()
             if flagged == coords:
                 print("\033[%d;1HYou win!\nThe game took %.2f seconds." % (height + 5, time.time() - start))
                 break
         elif mode == [32]:
             if player_info[cy][cx] == 1:
                 continue
-            if grid[cy][cx]:
-                print("\033[%d;1HOops! You exploded. Better luck next time!" % (height + 5))
-                break
             else:
-                reveal(cy, cx)
+                try:
+                    reveal(cy, cx)
+                except:
+                    print("\033[2J\033[1;1H%s\n\nOops! You exploded. Better luck next time!" % finalBoardString())
+                    break
         elif mode == [27, 91, 65]:
             cy -= 1
             cy %= height
@@ -284,4 +308,4 @@ def start(*vals):
         sys.stdout.write("\033[%d;1H>\033[1;%dHv\033[%d;%dH" % (cy + 3, cx + 3, cy + 3, cx + 3))
         sys.stdout.flush()
 
-start()
+start(*[int(x) if x.isdigit() else x for x in sys.argv[1:]])
