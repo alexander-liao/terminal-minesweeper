@@ -202,16 +202,21 @@ def start(*vals):
             current = list(coords)
             coords = set()
             for r, c in current:
-                if 0 <= r < height and 0 <= c < width and not (2 <= player_info[r][c] <= 10) and not grid[r][c]:
+                if 0 <= r < height and 0 <= c < width and not grid[r][c]:
                     a = player_info[r][c] = neighbor_info[r][c] + 2
                     sys.stdout.write("\033[%d;%dH%s" % (r + 3, c + 3, strings[a] + "\033[0m"))
                     sys.stdout.flush()
-                    if a == 2:
-                        for i in range(-1, 2):
-                            for j in range(-1, 2):
-                                if i or j:
-                                    if (r + i, c + j) not in passed:
-                                        coords.add((r + i, c + j))
+                    subcoords = set()
+                    total = 0
+                    for i in range(-1, 2):
+                        for j in range(-1, 2):
+                            if (i or j) and 0 <= r + i < height and 0 <= c + j < width:
+                                if player_info[r + i][c + j] == 1:
+                                    total += 1
+                                if (r + i, c + j) not in passed:
+                                    subcoords.add((r + i, c + j))
+                    if a == 2: #total + 2 == a: # TODO ask betseg about this
+                        coords |= subcoords
     def display_border():
         print("\n +" + "-" * width + "+\n" + (" |" + " " * width + "|\n") * height + " +" + "-" * width + "+", end = "")
     def wipe_vcursors():
