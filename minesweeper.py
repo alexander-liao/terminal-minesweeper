@@ -146,9 +146,9 @@ def start(*vals):
     print("This software is provided as-is with no warranty.")
     print("See LICENSE for more information. This software is licensed under the MIT License.")
     print()
-    diff = vals[0] if len(vals) >= 1 else input("Please select a difficulty [easy | medium | hard | custom]: ").lower()
-    while diff not in ["easy", "medium", "hard", "custom"]:
-        diff = input("Invalid selection. Please choose from [easy | medium | hard | custom]: ").lower()
+    diff = vals[0] if len(vals) >= 1 else input("Please select a difficulty [easy | medium | hard | custom | load]: ").lower()
+    while diff not in ["easy", "medium", "hard", "custom", "load"]:
+        diff = input("Invalid selection. Please choose from [easy | medium | hard | custom | load]: ").lower()
     if diff == "easy":
         width  = 8
         height = 8
@@ -161,14 +161,21 @@ def start(*vals):
         width  = 30
         height = 16
         mines  = 99
-    else:
+    elif diff == "custom":
         width  = vals[1] if len(vals) >= 2 and type(vals[1]) == int else getIntInput("Please enter a width between 1 and %d: " % (size()[1] - 5), "Not a valid integer in the range. Please try again: ", 1, size()[1] - 3)
         height = vals[2] if len(vals) >= 3 and type(vals[2]) == int else getIntInput("Please enter a height between 1 and %d: " % (size()[0] - 5), "Not a valid integer in the range. Please try again: ", 1, size()[0] - 3)
         mines  = vals[3] if len(vals) >= 4 and type(vals[3]) == int else getIntInput("Please enter a number of mines between 1 and %d: " % (width * height), "Not a valid integer in the range. Please try again: ", 1, width * height)
+    if diff == "load":
+        with open(vals[1] if len(vals) >= 2 else input("Please enter the relative or absolute path to the file: "), "r") as f:
+            grid = list(map(list, f.read().strip("\n").split("\n")))
+            coords = {(i, j) for i, r in enumerate(grid) for j, c in enumerate(r) if c == "*"}
+            width = len(grid[0])
+            height = len(grid)
+    else:
+        coords = [(r, c) for r in range(height) for c in range(width) if r or c]
+        random.shuffle(coords)
+        coords = set(coords[:mines])
     grid = [[0] * width for _ in range(height)]
-    coords = [(r, c) for r in range(height) for c in range(width) if r or c]
-    random.shuffle(coords)
-    coords = set(coords[:mines])
     neighbor_info = [[0] * width for _ in range(height)]
     for r, c in coords:
         grid[r][c] = 1
