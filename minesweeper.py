@@ -24,7 +24,7 @@ SOFTWARE.
 
 from __future__ import print_function, division
 
-import sys, os, fcntl, struct, termios, random, time
+import sys, os, fcntl, struct, termios, random, time, json
 
 if sys.version[0] == "2": input = raw_input
 
@@ -140,6 +140,44 @@ def getIntInput(prompt, retry, MIN = None, MAX = None):
         except:
             pass
 
+try:
+    with open("config.json", "r") as f:
+        config = json.loads(f.read())
+except:
+    config = {
+      "keybindings": {
+        "addflag": [100],
+        "toggleflag": [102],
+        "unflag": [103],
+        "cursorU": [27, 91, 65],
+        "cursorD": [27, 91, 66],
+        "cursorL": [27, 91, 67],
+        "cursorR": [27, 91, 68],
+        "step": [32],
+        "rerender": [114]
+      },
+      "renderchars": [
+          " ",
+          "CSI1;31mF",
+          "CSI1;30m0",
+          "CSI33m1",
+          "CSI34m2",
+          "CSI1;33m3",
+          "CSI1;34m4",
+          "CSI1;35m5",
+          "CSI1;37m6",
+          "CSI1;37m7",
+          "CSI1;37m8"
+      ]
+    }
+
+class AttrGetter:
+    def __init__(self, attrs):
+        self.attrs = attrs
+        self.attrs["attrs"] = attrs
+    def __getattr__(self, attrname):
+        return self.attrs[attrname]
+
 def start(*vals):
     clear()
     print("Terminal Minesweeper v0.1 by Alexander Liao (c) 2018.")
@@ -188,19 +226,6 @@ def start(*vals):
     player_info = [[0] * width for _ in range(height)]
     cx = 0
     cy = 0
-    strings = [
-        " ",
-        "\033[1;31mF",
-        "\033[1;30m0",
-        "\033[33m1",
-        "\033[34m2",
-        "\033[1;33m3",
-        "\033[1;34m4",
-        "\033[1;35m5",
-        "\033[1;37m6",
-        "\033[1;37m7",
-        "\033[1;37m8"
-    ]
     def finalBoardString():
         string = " +" + "-" * width + "+"
         return "\n" + string + "\n" + "\n".join(
@@ -208,14 +233,13 @@ def start(*vals):
                 (
                     "\033[41mO"
                     if grid[r][c]
-                    else strings[2 + neighbor_info[r][c]]
+                    else config["renderchars"][2 + neighbor_info[r][c]].replace("CSI", "\033[")
                 ) + "\033[0m"
                 for c in range(width))
             + "|"
         for r in range(height)) + "\n" + string
     flagged = set()
-    def reveal(R, C, current = False):
-        passed = set()
+    def reveal(R, C, current = False, passed = set()):
         coords = {(R, C)}
         while coords:
             passed |= coords
@@ -227,7 +251,7 @@ def start(*vals):
                     a = player_info[r][c] = neighbor_info[r][c] + 2
                     if (r, c) in flagged:
                         flagged.remove((r, c))
-                    sys.stdout.write("\033[%d;%dH%s" % (r + 3, c + 3, strings[a] + "\033[0m"))
+                    sys.stdout.write("\033[%d;%dH%s" % (r + 3, c + 3, config["renderchars"][a].replace("CSI", "\033[") + "\033[0m"))
                     sys.stdout.flush()
                     subcoords = set()
                     total = 0
@@ -255,7 +279,7 @@ def start(*vals):
         print(" " * cx + "  v")
         print(" +" + "-" * width + "+")
         for j, r in enumerate(player_info):
-            print((">" if j == cy else " ") + "|" + "".join(strings[e] + "\033[0m" for i, e in enumerate(r)) + "|")
+            print((">" if j == cy else " ") + "|" + "".join(config["renderchars"][e].replace("CSI", "\033[") + "\033[0m" for i, e in enumerate(r)) + "|")
         print(" +" + "-" * width + "+", end = "")
     clear()
     display_border()
@@ -263,33 +287,40 @@ def start(*vals):
     sys.stdout.flush()
     start = time.time()
     while True:
-        mode = getComboOption([[113], [102], [32], [27, 91, 65], [27, 91, 66], [27, 91, 67], [27, 91, 68]])
-        if mode == [113]:
+        kb = AttrGetter(config["keybindings"])
+        mode = getComboOption([
+            kb.quit, kb.addflag, kb.toggleflag, kb.unflag, kb.cursorU, kb.cursorD, kb.cursorL, kb.cursorR, kb.step, kb.rerender
+        ])
+        if mode == kb.quit:
             sys.stdout.write("\033[%d;1H" % (height + 5))
             break
-        elif mode == [102]:
-            if player_info[cy][cx] == 1:
-                flagged.remove((cy, cx))
-                player_info[cy][cx] = 0
-                sys.stdout.write("\033[%d;%dH\033[0m " % (cy + 3, cx + 3))
-                sys.stdout.flush()
-            elif player_info[cy][cx] == 0:
-                flagged.add((cy, cx))
-                player_info[cy][cx] = 1
-                sys.stdout.write("\033[%d;%dH\033[1;31mF\033[0m" % (cy + 3, cx + 3))
-                sys.stdout.flush()
-            else:
-                a = [(cy + i, cx + j) for i in range(-1, 2) for j in range(-1, 2) if 0 <= cy + i < height and 0 <= cx + j < width and player_info[cy + i][cx + j] < 2]
-                if len(a) == neighbor_info[cy][cx]:
-                    for r, c in a:
-                        flagged.add((r, c))
-                        player_info[r][c] = 1
-                        sys.stdout.write("\033[%d;%dH\033[1;31mF\033[0m" % (r + 3, c + 3))
-                        sys.stdout.flush()
-            if flagged == coords:
-                print("\033[%d;1HYou win!\nThe game took %.2f seconds." % (height + 5, time.time() - start))
-                break
-        elif mode == [32]:
+        elif mode in [kb.addflag, kb.toggleflag] and player_info[cy][cx] == 0:
+            flagged.add((cy, cx))
+            player_info[cy][cx] = 1
+            sys.stdout.write("\033[%d;%dH\033[1;31mF\033[0m" % (cy + 3, cx + 3))
+            sys.stdout.flush()
+        elif mode in [kb.unflag, kb.toggleflag] and player_info[cy][cx] == 1:
+            flagged.remove((cy, cx))
+            player_info[cy][cx] = 0
+            sys.stdout.write("\033[%d;%dH\033[0m " % (cy + 3, cx + 3))
+            sys.stdout.flush()
+        elif mode == kb.addflag and player_info[cy][cx] >= 2:
+            a = [(cy + i, cx + j) for i in range(-1, 2) for j in range(-1, 2) if 0 <= cy + i < height and 0 <= cx + j < width and player_info[cy + i][cx + j] < 2]
+            if len(a) == neighbor_info[cy][cx]:
+                for r, c in a:
+                    flagged.add((r, c))
+                    player_info[r][c] = 1
+                    sys.stdout.write("\033[%d;%dH\033[1;31mF\033[0m" % (r + 3, c + 3))
+                    sys.stdout.flush()
+        elif mode == kb.unflag and player_info[cy][cx] >= 2:
+            for i in range(-1, 2):
+                for j in range(-1, 2):
+                    r, c = cy + i, cx + j
+                    if (i or j) and 0 <= r < height and 0 <= c < height and player_info[r][c] == 1:
+                        flagged.remove((r, c))
+                        player_info[r][c] = 0
+                        sys.stdout.write("\033[%d;%dH\033[0m " % (r + 3, c + 3))
+        elif mode == kb.step:
             if player_info[cy][cx] == 1:
                 continue
             else:
@@ -298,21 +329,30 @@ def start(*vals):
                 except:
                     print("\033[2J\033[1;1H%s\n\nOops! You exploded. Better luck next time!" % finalBoardString())
                     break
-        elif mode == [27, 91, 65]:
+        elif mode == kb.rerender:
+            sys.stdout.write("\033[2J\033[1;1H")
+            print("\n +" + "-" * width + "+")
+            for row in player_info:
+                print(" |" + "".join(config["renderchars"][elem].replace("CSI", "\033[") + "\033[0m" for elem in row) + "|")
+            print(" +" + "-" * width + "+")
+        elif mode == kb.cursorU:
             cy -= 1
             cy %= height
-        elif mode == [27, 91, 66]:
+        elif mode == kb.cursorD:
             cy += 1
             cy %= height
-        elif mode == [27, 91, 67]:
+        elif mode == kb.cursorL:
             cx += 1
             cx %= width
-        elif mode == [27, 91, 68]:
+        elif mode == kb.cursorR:
             cx -= 1
             cx %= width
         wipe_hcursors()
         wipe_vcursors()
         sys.stdout.write("\033[%d;1H>\033[1;%dHv\033[%d;%dH" % (cy + 3, cx + 3, cy + 3, cx + 3))
         sys.stdout.flush()
+        if flagged == coords:
+            print("\033[%d;1HYou win!\nThe game took %.2f seconds." % (height + 5, time.time() - start))
+            break
 
 start(*[int(x) if x.isdigit() else x for x in sys.argv[1:]])

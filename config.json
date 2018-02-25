@@ -1,0 +1,27 @@
+{
+  "keybindings": {
+    "quit": [113],
+    "addflag": [100],
+    "toggleflag": [102],
+    "unflag": [103],
+    "cursorU": [27, 91, 65],
+    "cursorD": [27, 91, 66],
+    "cursorL": [27, 91, 67],
+    "cursorR": [27, 91, 68],
+    "step": [32],
+    "rerender": [114]
+  },
+  "renderchars": [
+      " ",
+      "CSI1;31mF",
+      "CSI1;30m0",
+      "CSI33m1",
+      "CSI34m2",
+      "CSI1;33m3",
+      "CSI1;34m4",
+      "CSI1;35m5",
+      "CSI1;37m6",
+      "CSI1;37m7",
+      "CSI1;37m8"
+  ]
+}
