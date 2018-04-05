@@ -154,7 +154,8 @@ except:
         "cursorL": [27, 91, 67],
         "cursorR": [27, 91, 68],
         "step": [32],
-        "rerender": [114]
+        "rerender": [114],
+        "quit": [113]
       },
       "renderchars": [
           " ",
